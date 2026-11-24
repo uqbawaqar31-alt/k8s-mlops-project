@@ -1,0 +1,5 @@
+{
+  "dataset": "iris",
+  "model_type": "LogisticRegression",
+  "accuracy": 0.9333
+}

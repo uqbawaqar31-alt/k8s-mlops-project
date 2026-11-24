@@ -1,0 +1,202 @@
+# PIPELINE DEFINITION
+# Name: iris-classification-pipeline
+# Description: Iris ML pipeline
+# Inputs:
+#    test_size: float [Default: 0.2]
+components:
+  comp-comp-evaluate:
+    executorLabel: exec-comp-evaluate
+    inputDefinitions:
+      parameters:
+        trained:
+          parameterType: STRUCT
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-comp-preprocess:
+    executorLabel: exec-comp-preprocess
+    inputDefinitions:
+      parameters:
+        test_size:
+          defaultValue: 0.2
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRUCT
+  comp-comp-train:
+    executorLabel: exec-comp-train
+    inputDefinitions:
+      parameters:
+        dataset:
+          parameterType: STRUCT
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRUCT
+deploymentSpec:
+  executors:
+    exec-comp-evaluate:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - comp_evaluate
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef comp_evaluate(trained: dict) -> float:\n    import numpy as np\n\
+          \    from sklearn.linear_model import LogisticRegression\n    from sklearn.metrics\
+          \ import accuracy_score\n\n    clf = LogisticRegression()\n    clf.classes_\
+          \ = np.array(trained[\"classes\"])\n    clf.coef_ = np.array(trained[\"\
+          coef\"])\n    clf.intercept_ = np.array(trained[\"intercept\"])\n    preds\
+          \ = clf.predict(trained[\"X_test\"])\n    return float(accuracy_score(trained[\"\
+          y_test\"], preds))\n\n"
+        image: python:3.11-slim
+    exec-comp-preprocess:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - comp_preprocess
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \ 'joblib'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.18.2' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef comp_preprocess(test_size: float = 0.2) -> dict:\n    from sklearn.datasets\
+          \ import load_iris\n    from sklearn.model_selection import train_test_split\n\
+          \    from sklearn.preprocessing import StandardScaler\n\n    iris = load_iris()\n\
+          \    X_tr, X_te, y_tr, y_te = train_test_split(\n        iris.data, iris.target,\
+          \ test_size=test_size, random_state=42, stratify=iris.target\n    )\n  \
+          \  scaler = StandardScaler()\n    X_tr = scaler.fit_transform(X_tr).tolist()\n\
+          \    X_te = scaler.transform(X_te).tolist()\n    return {\"X_train\": X_tr,\
+          \ \"X_test\": X_te, \"y_train\": y_tr.tolist(), \"y_test\": y_te.tolist()}\n\
+          \n"
+        image: python:3.11-slim
+    exec-comp-train:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - comp_train
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef comp_train(dataset: dict) -> dict:\n    from sklearn.linear_model\
+          \ import LogisticRegression\n\n    clf = LogisticRegression(max_iter=200,\
+          \ random_state=42)\n    clf.fit(dataset[\"X_train\"], dataset[\"y_train\"\
+          ])\n    return {\n        \"coef\": clf.coef_.tolist(),\n        \"intercept\"\
+          : clf.intercept_.tolist(),\n        \"classes\": clf.classes_.tolist(),\n\
+          \        \"X_test\": dataset[\"X_test\"],\n        \"y_test\": dataset[\"\
+          y_test\"],\n    }\n\n"
+        image: python:3.11-slim
+pipelineInfo:
+  description: Iris ML pipeline
+  name: iris-classification-pipeline
+root:
+  dag:
+    tasks:
+      comp-evaluate:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-comp-evaluate
+        dependentTasks:
+        - comp-train
+        inputs:
+          parameters:
+            trained:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: comp-train
+        taskInfo:
+          name: comp-evaluate
+      comp-preprocess:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-comp-preprocess
+        inputs:
+          parameters:
+            test_size:
+              componentInputParameter: test_size
+        taskInfo:
+          name: comp-preprocess
+      comp-train:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-comp-train
+        dependentTasks:
+        - comp-preprocess
+        inputs:
+          parameters:
+            dataset:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: comp-preprocess
+        taskInfo:
+          name: comp-train
+  inputDefinitions:
+    parameters:
+      test_size:
+        defaultValue: 0.2
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.18.2

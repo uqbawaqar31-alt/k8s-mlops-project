@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-lb-config
+  namespace: mlops-k8s
+data:
+  default.conf: |
+    upstream iris_backend {
+        server iris-model-svc.mlops-k8s.svc.cluster.local:8000;
+    }
+
+    server {
+        listen 80;
+
+        location / {
+            proxy_pass http://iris_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            add_header X-Load-Balancer "nginx-k8s-lb";
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-lb-deployment
+  namespace: mlops-k8s
+  labels:
+    app: nginx-lb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-lb
+  template:
+    metadata:
+      labels:
+        app: nginx-lb
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: lb-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+      volumes:
+        - name: lb-conf
+          configMap:
+            name: nginx-lb-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb-svc
+  namespace: mlops-k8s
+spec:
+  selector:
+    app: nginx-lb
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
